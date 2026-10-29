@@ -1,0 +1,66 @@
+/* Lamp state controls both the studio lighting and the entire page palette. */
+:root{--theme-duration:950ms;--theme-ease:cubic-bezier(.4,0,.2,1)}
+html,body,.nav,.hero.cabinet-hero,.work,.about,.capabilities,.experiments,.contact,.nav-links,.cabinet-directory,.cabinet-intro,.experiment-dialog{transition:background-color var(--theme-duration) var(--theme-ease),border-color var(--theme-duration) var(--theme-ease)}
+.nav a,.cabinet-topline,.cabinet-intro p,.cabinet-intro h1,.cabinet-intro h1>span,.cabinet-stage-index,.cabinet-directory a,.directory-title,.cabinet-side-note,.section-heading h2,.section-heading h2 span,.section-note,.about-copy p,.timeline-row,.cap-card,.experiment-heading{transition:color var(--theme-duration) var(--theme-ease),border-color var(--theme-duration) var(--theme-ease)}
+body:before{content:'';position:fixed;inset:0;z-index:45;pointer-events:none;opacity:0;background:radial-gradient(ellipse at var(--lamp-screen-x,70vw) var(--lamp-screen-y,35vh),#ffe4b044 0%,#b7b5aa16 30%,transparent 65%)}
+.theme-switching body:before{animation:studio-exposure 1.1s ease-in-out both}
+@keyframes studio-exposure{0%,100%{opacity:0}35%{opacity:.85}65%{opacity:.2}}
+.cabinet-lamp-label{position:absolute;left:60%;top:25%;transform:translate(15px,-50%);display:flex;align-items:center;gap:8px;z-index:4;border:1px solid #8c7750;background:#26261fe8;color:#e4d6b2;padding:9px 11px;font:10px var(--mono);cursor:pointer;white-space:nowrap;box-shadow:0 3px 16px #0002;transition:background-color .2s,color .2s}
+.cabinet-lamp-label:hover{background:#5b5134;color:#fff1c7}.lamp-state-dot{width:5px;height:5px;display:block;border-radius:50%;background:#f6ca7e;box-shadow:0 0 9px #ffcc77a0}
+.lamp-accessible-toggle{position:absolute;bottom:24px;left:30px;z-index:3;display:flex;align-items:center;gap:10px;padding:8px 0;background:transparent;color:#a7b19b;border:0;border-bottom:1px solid #374332;font-size:10px;cursor:pointer}.lamp-accessible-toggle svg{color:#d6bc88}.lamp-accessible-toggle:hover{color:#dedcc6}
+:root[data-theme=night]{color-scheme:dark;--bg:#0d120f;--panel:#19231d;--line:#354236;--muted:#9aab98;--acid:#becda2;color:#e2e0cf}
+:root[data-theme=day]{color-scheme:light;--bg:#fff;--panel:#f3f5f0;--line:#c9d1c5;--muted:#63715f;--acid:#365c44;color:#25392b;background:#fff}
+:root[data-theme=day] body{background:#fff;color:#25392b}
+:root[data-theme=day] body:after{opacity:.015}
+:root[data-theme=day] .hero.cabinet-hero{background:#fff;color:#25392b}
+:root[data-theme=day] .nav{color:#25392b;border-color:#d7ddd3}
+:root[data-theme=day] .nav-links a{color:#4e604c}
+:root[data-theme=day] .nav-contact{border-color:#aab7a4}
+:root[data-theme=day] .nav-contact:hover{background:#365c44;color:#fff}
+:root[data-theme=day] .nav-links span,:root[data-theme=day] .wordmark span{color:#71816a}
+:root[data-theme=day] .menu-toggle{color:#2d4934}
+:root[data-theme=day] .hero.cabinet-hero h1{color:#263f2d}
+:root[data-theme=day] .hero.cabinet-hero h1>span{color:#62805b}
+:root[data-theme=day] .cabinet-intro .eyebrow{color:#5a7251}
+:root[data-theme=day] .cabinet-topline,:root[data-theme=day] .cabinet-description{color:#64725f;border-color:#d4dccf}
+:root[data-theme=day] .cabinet-view-status,:root[data-theme=day] .cabinet-side-note>.mono{color:#6e7c65}
+:root[data-theme=day] .cabinet-side-note a{color:#4d6445}
+:root[data-theme=day] .cabinet-stage-index,:root[data-theme=day] .cabinet-stage-index>span:last-child,:root[data-theme=day] .cabinet-ground-label{color:#78896d}
+:root[data-theme=day] .drawer-toggle{background:#365c44;border-color:#365c44;color:#f6f7ed}
+:root[data-theme=day] .drawer-toggle .mono{color:#becdb4}
+:root[data-theme=day] .drawer-toggle:hover{background:#497553}
+:root[data-theme=day] .cabinet-directory,:root[data-theme=day] .cabinet-directory>a{border-color:#cbd4c5;color:#344d36}
+:root[data-theme=day] .directory-title .mono,:root[data-theme=day] .cabinet-directory>a>div>span,:root[data-theme=day] .directory-title p{color:#687a5f}
+:root[data-theme=day] .cabinet-directory>a>.mono,:root[data-theme=day] .cabinet-directory>a>svg{color:#859879}
+:root[data-theme=day] .cabinet-directory>a:hover,:root[data-theme=day] .cabinet-bottomline a{color:#365b38}
+:root[data-theme=day] .lamp-accessible-toggle{color:#4b6647;border-color:#b3c1a9}
+:root[data-theme=day] .lamp-accessible-toggle svg{color:#677d4c}
+:root[data-theme=day] .cabinet-lamp-label{background:#f2f0e5eb;color:#41583c;border-color:#b1bda6}
+:root[data-theme=day] .cabinet-lamp-label:hover{background:#e1e7d6}
+:root[data-theme=day] .lamp-state-dot{background:#6e8167;box-shadow:none}
+:root[data-theme=day] .cabinet-note-label{background:#faf3e0ef;color:#6e5b34;border-color:#b4a274}
+:root[data-theme=day] .cabinet-object-label{background:#fffdf0ed;color:#365336;border-color:#879d77}
+:root[data-theme=day] .cabinet-object-label>span{color:#7a906b}
+:root[data-theme=day] .cabinet-object-label:hover{background:#365c44;color:#fff}
+:root[data-theme=day] .work,:root[data-theme=day] .capabilities{background:#fff;color:#25392b}
+:root[data-theme=day] .section-heading h2 span{color:#7c8c72}
+:root[data-theme=day] .project-title p,:root[data-theme=day] .project-no,:root[data-theme=day] .project-year{color:#67755e}
+:root[data-theme=day] .project-arrow{background:#c1cf9e;color:#263d2b}
+:root[data-theme=day] .about{background:#f2f4ed;color:#25392b;border-color:#d6ddcf}
+:root[data-theme=day] .about-lead span{color:#7c8e70}
+:root[data-theme=day] .about-body{color:#607057}
+:root[data-theme=day] .stat strong{color:#547446}
+:root[data-theme=day] .cap-copy,:root[data-theme=day] .cap-tags span{color:#5b6c51}
+:root[data-theme=day] .experiments{background:#f2f5ed;color:#25392b}
+:root[data-theme=day] .contact{background:#e1e8d1;color:#25392b}
+:root[data-theme=day] .contact h2{color:#263d2b}
+:root[data-theme=day] .contact h2 em{color:#718265}
+:root[data-theme=day] .experiment-dialog{background:#fff;color:#25392b}
+:root[data-theme=day] .experiment-dialog button{color:#365c44}
+@media(max-width:760px){.lamp-accessible-toggle{left:0;bottom:26px;font-size:9px}.cabinet-lamp-label{font-size:8px;padding:7px 8px}.cabinet-ground-label{bottom:8px}}
+@media(prefers-reduced-motion:reduce){.theme-switching body:before{animation:none}html,body,.nav,.hero.cabinet-hero,.work,.about,.capabilities,.experiments,.contact,.cabinet-directory{transition:none}}
+
+/* Explicit leaf colors avoid inherited transitions lagging behind the theme. */
+:root[data-theme=night] .hero.cabinet-hero h1{color:#dedfcd}
+:root[data-theme=night] .section-heading h2{color:#dedfcd}
+:root[data-theme=day] .section-heading h2{color:#25392b}
