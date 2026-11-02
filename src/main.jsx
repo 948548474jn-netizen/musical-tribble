@@ -70,6 +70,32 @@ function Hero() {
     const hero = heroRef.current;
     const type = typeRef.current;
     const media = gsap.matchMedia();
+    let disposed = false;
+    const letteringMetrics = document.createElement('canvas').getContext('2d');
+    const fitLettering = () => {
+      if (disposed) return;
+      if (!letteringMetrics) return;
+      let style = getComputedStyle(type);
+      const measure = () => {
+        letteringMetrics.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        return letteringMetrics.measureText('Portfolio');
+      };
+      let metrics = measure();
+      const inkWidth = metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight;
+      if (!inkWidth) return;
+      type.style.fontSize = `${parseFloat(style.fontSize) * hero.clientWidth * 0.93 / inkWidth}px`;
+      style = getComputedStyle(type); metrics = measure();
+      const stageLeft = type.parentElement.getBoundingClientRect().left - hero.getBoundingClientRect().left;
+      type.style.left = `${hero.clientWidth * 0.0365 + metrics.actualBoundingBoxLeft - stageLeft}px`;
+      if (hero.clientWidth > 760) {
+        const baseline = (parseFloat(style.lineHeight) - metrics.fontBoundingBoxAscent - metrics.fontBoundingBoxDescent) / 2 + metrics.fontBoundingBoxAscent;
+        type.style.top = `${hero.clientHeight * 0.139 - baseline + metrics.actualBoundingBoxAscent}px`;
+      } else type.style.removeProperty('top');
+    };
+    const letteringObserver = new ResizeObserver(fitLettering);
+    letteringObserver.observe(hero);
+    document.fonts.ready.then(fitLettering);
+    document.fonts.addEventListener('loadingdone', fitLettering);
 
     media.add('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)', () => {
       // Animate the light only, keeping the artwork and text layout stable.
@@ -98,14 +124,22 @@ function Hero() {
         window.removeEventListener('blur', reset);
       };
     });
-    return () => media.revert();
+    return () => {
+      disposed = true;
+      letteringObserver.disconnect();
+      document.fonts.removeEventListener('loadingdone', fitLettering);
+      type.style.removeProperty('font-size');
+      type.style.removeProperty('left');
+      type.style.removeProperty('top');
+      media.revert();
+    };
   }, { scope: heroRef });
 
-  return <section className="hero archive-hero" id="top" ref={heroRef} aria-labelledby="archive-title">
+  return <><section className="hero archive-hero" id="top" ref={heroRef} aria-labelledby="archive-title">
     <div className="archive-shell">
     <div className="archive-stage">
       <div className="archive-type" ref={typeRef} aria-hidden="true">
-        PORTFOLIO<span className="archive-type-light" aria-hidden="true">PORTFOLIO</span>
+        Portfolio<span className="archive-type-light" aria-hidden="true">Portfolio</span>
       </div>
       <div id="archive-model" className={`archive-visual ${sceneReady ? 'is-ready' : ''}`} role="group" aria-label="墨绿色设计档案柜，包含作品集、简历和技能卡" aria-busy={!sceneReady && !sceneFallback}>
         <img className="archive-poster" src={`${import.meta.env.BASE_URL}models/portfolio-archive-poster.webp`} alt="墨绿色金属档案柜与橙红色关节台灯" fetchPriority="high" decoding="async" />
@@ -121,9 +155,8 @@ function Hero() {
         {sceneFallback ? <a className="archive-open" href="#work">浏览精选作品 <ArrowUpRight size={17}/></a> : <><button className="archive-open" type="button" onClick={toggleDrawer} disabled={!sceneReady} aria-expanded={drawerOpen} aria-controls="archive-model">{drawerOpen ? '收起设计抽屉' : '打开设计抽屉'} <ArrowUpRight size={17}/></button><a className="archive-browse" href="#work">查看作品 <ArrowDownRight size={16}/></a></>}
       </div></div>
     </div>
-    <nav className="archive-foot" aria-label="首页快捷入口"><a href="#work">精选作品 <ArrowUpRight size={15}/></a><a href="#about">关于江南 <ArrowUpRight size={15}/></a></nav>
     </div>
-  </section>;
+  </section><nav className="archive-foot" aria-label="首页快捷入口"><a href="#work">精选作品 <ArrowUpRight size={15}/></a><a href="#about">关于江南 <ArrowUpRight size={15}/></a></nav></>;
 }
 
 function SectionHead({ index, title, sub, note }) {

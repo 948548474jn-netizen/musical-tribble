@@ -51,6 +51,7 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
       frame = requestAnimationFrame(() => {
         frame = 0;
         if (!alive || !apiRef.current) return;
+        apiRef.current.frameCamera?.();
         renderer.shadowMap.needsUpdate = true;
         renderer.render(scene, apiRef.current.camera);
         host.dataset.drawerPosition = apiRef.current.drawer.position.z.toFixed(3);
@@ -134,6 +135,37 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
           renderer.setSize(width, height, false);
           camera.aspect = width / height;
           camera.clearViewOffset(); camera.zoom = 1;
+          apiRef.current.frameCamera = null;
+          if (width > 760) {
+            // Match the supplied composition using two visible landmarks and the
+            // original close Blender camera, rather than a distant bounding-box view.
+            camera.fov = 40;
+            camera.position.set(0.716, 2.067, 1.724);
+            camera.lookAt(0.03, 0.66, 0.24);
+            camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+            const lamp = new THREE.Vector3(-0.12, 1.48, -0.20);
+            const cabinetCorner = new THREE.Vector3(-0.65, 0.6925, -0.43);
+            const pixel = (point) => {
+              const p = point.clone().project(camera);
+              return new THREE.Vector2((p.x * 0.5 + 0.5) * width, (-p.y * 0.5 + 0.5) * height);
+            };
+            const delta = pixel(lamp).sub(pixel(cabinetCorner));
+            const wantedDelta = new THREE.Vector2((0.708 - 0.619) * width, (0.120 - 0.355) * height);
+            const homeZoom = delta.dot(wantedDelta) / delta.lengthSq();
+            const frameCamera = () => {
+              const progress = THREE.MathUtils.clamp((drawer.position.z - 0.34) / 0.34, 0, 1);
+              camera.clearViewOffset();
+              camera.zoom = homeZoom * (1 - progress * 0.26);
+              camera.updateProjectionMatrix();
+              const anchor = pixel(lamp);
+              camera.setViewOffset(width, height, anchor.x - 0.708 * width, anchor.y - 0.120 * height, width, height);
+              camera.updateProjectionMatrix();
+            };
+            apiRef.current.frameCamera = frameCamera;
+            frameCamera(); invalidate();
+            return;
+          }
+          camera.fov = 35;
           const tanY = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
           const tanX = tanY * camera.aspect;
           const distance = Math.max(...corners.flatMap((point) => [point.z + Math.abs(point.x) / (tanX * 0.91), point.z + Math.abs(point.y) / (tanY * 0.91)]));
