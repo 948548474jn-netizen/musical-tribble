@@ -1,7 +1,15 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { gsap } from 'gsap';
+import { useGSAP } from '@gsap/react';
 import { ArrowDownRight, ArrowUpRight, ArrowRight, Menu, X, MoveUpRight } from 'lucide-react';
 import './styles.css';
+
+gsap.registerPlugin(useGSAP);
+// Keep interaction duration consistent when a graphics frame takes longer to render.
+gsap.ticker.lagSmoothing(0);
+
+const ArchiveScene = lazy(() => import('./ArchiveScene.jsx'));
 
 const projects = [
   {
@@ -37,9 +45,9 @@ function Header() {
   return <header className="nav">
     <a className="wordmark" href="#top" onClick={close}>JN<span>®</span></a>
     <div className={`nav-links ${open ? 'is-open' : ''}`}>
-      <a href="#work" onClick={close}>作品 <span>01</span></a>
-      <a href="#about" onClick={close}>关于 <span>02</span></a>
-      <a href="#capabilities" onClick={close}>能力 <span>03</span></a>
+      <a href="#work" onClick={close}>作品</a>
+      <a href="#about" onClick={close}>关于</a>
+      <a href="#capabilities" onClick={close}>能力</a>
     </div>
     <a className="nav-contact" href="#contact">联系我 <ArrowUpRight size={15}/></a>
     <button className="menu-toggle" onClick={() => setOpen(!open)} aria-label="切换导航">{open ? <X/> : <Menu/>}</button>
@@ -47,22 +55,74 @@ function Header() {
 }
 
 function Hero() {
-  return <section className="hero" id="top">
-    <video className="hero-video" autoPlay muted loop playsInline poster="https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?auto=format&fit=crop&w=2000&q=80">
-      <source src="https://videos.pexels.com/video-files/3129671/3129671-hd_1920_1080_25fps.mp4" type="video/mp4" />
-    </video>
-    <div className="hero-shade"/>
-    <div className="hero-meta"><span>INDEPENDENT DESIGN PRACTICE</span><span>BEIJING, CN / AVAILABLE WORLDWIDE</span></div>
-    <div className="hero-title-wrap">
-      <p className="eyebrow"><span className="live-dot"/> 视觉设计师 / AI 设计师 / 品牌设计师</p>
-      <h1>设计不止于<br/><em>看见。</em></h1>
-      <div className="hero-bottom">
-        <p>用视觉建立感知，<br/>用技术打开想象。</p>
-        <a className="round-link" href="#work" aria-label="查看精选作品"><ArrowDownRight size={24}/></a>
+  const heroRef = useRef(null);
+  const typeRef = useRef(null);
+  const [sceneReady, setSceneReady] = useState(false);
+  const [sceneFallback, setSceneFallback] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const toggleDrawer = useCallback(() => setDrawerOpen((value) => !value), []);
+  const handleSceneReady = useCallback((ready, status) => {
+    setSceneReady(ready);
+    setSceneFallback(status === 'fallback');
+  }, []);
+
+  useGSAP(() => {
+    const hero = heroRef.current;
+    const type = typeRef.current;
+    const media = gsap.matchMedia();
+
+    media.add('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)', () => {
+      // Animate the light only, keeping the artwork and text layout stable.
+      const lightX = gsap.quickTo(type, '--light-x', { duration: 0.9, ease: 'power3.out' });
+      const lightY = gsap.quickTo(type, '--light-y', { duration: 0.9, ease: 'power3.out' });
+      const glowX = gsap.quickTo(type, '--glow-x', { duration: 1.1, ease: 'power3.out' });
+      const glowY = gsap.quickTo(type, '--glow-y', { duration: 1.1, ease: 'power3.out' });
+      const move = (event) => {
+        const rect = type.getBoundingClientRect();
+        const x = gsap.utils.clamp(0, 100, (event.clientX - rect.left) / rect.width * 100);
+        const y = gsap.utils.clamp(0, 100, (event.clientY - rect.top) / rect.height * 100);
+        lightX(x); lightY(y);
+        glowX((x - 50) * 0.12); glowY((y - 50) * 0.08);
+      };
+      const reset = () => {
+        lightX(50); lightY(45); glowX(0); glowY(0);
+      };
+      hero.addEventListener('pointermove', move);
+      hero.addEventListener('pointerleave', reset);
+      hero.addEventListener('pointercancel', reset);
+      window.addEventListener('blur', reset);
+      return () => {
+        hero.removeEventListener('pointermove', move);
+        hero.removeEventListener('pointerleave', reset);
+        hero.removeEventListener('pointercancel', reset);
+        window.removeEventListener('blur', reset);
+      };
+    });
+    return () => media.revert();
+  }, { scope: heroRef });
+
+  return <section className="hero archive-hero" id="top" ref={heroRef} aria-labelledby="archive-title">
+    <div className="archive-shell">
+    <div className="archive-stage">
+      <div className="archive-type" ref={typeRef} aria-hidden="true">
+        PORTFOLIO<span className="archive-type-light" aria-hidden="true">PORTFOLIO</span>
+      </div>
+      <div id="archive-model" className={`archive-visual ${sceneReady ? 'is-ready' : ''}`} role="group" aria-label="墨绿色设计档案柜，包含作品集、简历和技能卡" aria-busy={!sceneReady && !sceneFallback}>
+        <img className="archive-poster" src={`${import.meta.env.BASE_URL}models/portfolio-archive-poster.webp`} alt="墨绿色金属档案柜与橙红色关节台灯" fetchPriority="high" decoding="async" />
+        <Suspense fallback={null}>
+          <ArchiveScene open={drawerOpen} onToggle={toggleDrawer} onReady={handleSceneReady}/>
+        </Suspense>
+        <span className="scene-hint" aria-live="polite">{sceneReady ? drawerOpen ? '档案已展开，慢慢翻阅。' : '点击拉手，打开档案。' : sceneFallback ? '向下探索，看看我的作品。' : '正在整理档案…'}</span>
       </div>
     </div>
-    <div className="hero-index"><span>SCROLL TO EXPLORE</span><span>© 2026 JIANG NAN</span></div>
-    <div className="hero-orbit" aria-hidden="true"><span/><span/><span/></div>
+    <div className="archive-caption">
+      <div><h1 className="archive-title" id="archive-title">江南的<br/>设计抽屉<span>。</span></h1><p className="archive-description">收藏作品，也收藏好奇心。</p>
+      <div className="archive-actions">
+        {sceneFallback ? <a className="archive-open" href="#work">浏览精选作品 <ArrowUpRight size={17}/></a> : <><button className="archive-open" type="button" onClick={toggleDrawer} disabled={!sceneReady} aria-expanded={drawerOpen} aria-controls="archive-model">{drawerOpen ? '收起设计抽屉' : '打开设计抽屉'} <ArrowUpRight size={17}/></button><a className="archive-browse" href="#work">查看作品 <ArrowDownRight size={16}/></a></>}
+      </div></div>
+    </div>
+    <nav className="archive-foot" aria-label="首页快捷入口"><a href="#work">精选作品 <ArrowUpRight size={15}/></a><a href="#about">关于江南 <ArrowUpRight size={15}/></a></nav>
+    </div>
   </section>;
 }
 
