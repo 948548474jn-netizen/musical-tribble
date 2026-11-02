@@ -36,7 +36,7 @@ function studioEnvironment(renderer) {
   return target;
 }
 
-export default function ArchiveScene({ open, onToggle, onReady }) {
+export default function ArchiveScene({ open, onToggle, onReady, onTransitionEnd, onSelectFolder }) {
   const hostRef = useRef(null);
   const apiRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
@@ -94,9 +94,14 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
         model = gltf.scene;
         let drawer, meshCount = 0;
         const handles = [];
+        const archiveRoots = new Map();
         model.traverse((object) => {
           const name = object.userData.name || object.name;
           if (name === 'DRAWER 02 · resume portfolio skills') drawer = object;
+          if (name.startsWith('FOLDER 01')) archiveRoots.set(object, 'work');
+          if (name.startsWith('FOLDER 02')) archiveRoots.set(object, 'resume');
+          if (name.startsWith('FOLDER 03')) archiveRoots.set(object, 'skills');
+          if (name.startsWith('MESSAGE 0')) archiveRoots.set(object, 'contact');
           if (!object.isMesh) return;
           meshCount++;
           object.castShadow = true; object.receiveShadow = true;
@@ -127,7 +132,7 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
         camera.position.copy(center).add(direction); camera.lookAt(center);
         const inverse = camera.quaternion.clone().invert();
         const corners = framingPoints.map((point) => point.clone().sub(center).applyQuaternion(inverse));
-        apiRef.current = { drawer, camera, invalidate, visible: true };
+        apiRef.current = { drawer, camera, invalidate, visible: true, pose: { progress: 0 } };
         const resize = () => {
           const { width, height } = host.getBoundingClientRect();
           if (!width || !height || !alive) return;
@@ -136,6 +141,28 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
           camera.aspect = width / height;
           camera.clearViewOffset(); camera.zoom = 1;
           apiRef.current.frameCamera = null;
+          const prepareTransition = (homeTarget) => {
+            const homePosition = camera.position.clone();
+            const homeZoom = camera.zoom, homeFov = camera.fov;
+            const offsetX = camera.view?.offsetX || 0, offsetY = camera.view?.offsetY || 0;
+            const topTarget = new THREE.Vector3(0, 0.14, 0.69);
+            const topDistance = Math.max(1.72, 1.35 / (2 * Math.tan(THREE.MathUtils.degToRad(20)) * camera.aspect * 0.90));
+            const topPosition = topTarget.clone().add(new THREE.Vector3(0, topDistance, 0));
+            const target = new THREE.Vector3();
+            apiRef.current.frameCamera = () => {
+              const progress = apiRef.current.pose.progress;
+              camera.position.lerpVectors(homePosition, topPosition, progress);
+              camera.up.set(0, 1 - progress, -progress).normalize();
+              target.lerpVectors(homeTarget, topTarget, progress);
+              camera.lookAt(target);
+              camera.fov = THREE.MathUtils.lerp(homeFov, 40, progress);
+              camera.zoom = THREE.MathUtils.lerp(homeZoom, 1, progress);
+              camera.setViewOffset(width, height, offsetX * (1 - progress), offsetY * (1 - progress), width, height);
+              camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+              host.dataset.cameraPhase = progress.toFixed(3);
+            };
+          };
+          camera.up.set(0, 1, 0);
           if (width > 760) {
             // Match the supplied composition using two visible landmarks and the
             // original close Blender camera, rather than a distant bounding-box view.
@@ -152,17 +179,13 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
             const delta = pixel(lamp).sub(pixel(cabinetCorner));
             const wantedDelta = new THREE.Vector2((0.708 - 0.619) * width, (0.120 - 0.355) * height);
             const homeZoom = delta.dot(wantedDelta) / delta.lengthSq();
-            const frameCamera = () => {
-              const progress = THREE.MathUtils.clamp((drawer.position.z - 0.34) / 0.34, 0, 1);
-              camera.clearViewOffset();
-              camera.zoom = homeZoom * (1 - progress * 0.26);
-              camera.updateProjectionMatrix();
-              const anchor = pixel(lamp);
-              camera.setViewOffset(width, height, anchor.x - 0.708 * width, anchor.y - 0.120 * height, width, height);
-              camera.updateProjectionMatrix();
-            };
-            apiRef.current.frameCamera = frameCamera;
-            frameCamera(); invalidate();
+            camera.zoom = homeZoom;
+            camera.updateProjectionMatrix();
+            const anchor = pixel(lamp);
+            camera.setViewOffset(width, height, anchor.x - 0.708 * width, anchor.y - 0.120 * height, width, height);
+            camera.updateProjectionMatrix();
+            prepareTransition(new THREE.Vector3(0.03, 0.66, 0.24));
+            invalidate();
             return;
           }
           camera.fov = 35;
@@ -180,7 +203,7 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
           camera.updateProjectionMatrix();
           [left, right, bottom, top] = projectedBounds();
           camera.setViewOffset(width, height, width * (left + right) / 4, -height * (bottom + top) / 4, width, height);
-          camera.updateProjectionMatrix(); invalidate();
+          camera.updateProjectionMatrix(); prepareTransition(center); invalidate();
         };
         observer = new ResizeObserver(resize); observer.observe(host); resize();
         visibility = new IntersectionObserver(([entry]) => {
@@ -191,14 +214,27 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
         visibility.observe(host);
 
         const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
-        const hitHandle = (event) => {
+        const actionAt = (event) => {
           const rect = renderer.domElement.getBoundingClientRect();
           pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
           raycaster.setFromCamera(pointer, camera);
-          return raycaster.intersectObjects(handles, true).length > 0;
+          const hit = raycaster.intersectObjects(model.children, true)[0];
+          if (!hit) return null;
+          let object = hit.object;
+          while (object) {
+            const section = archiveRoots.get(object);
+            if (section && (section === 'contact' || apiRef.current.pose.progress > 0.98)) return section;
+            object = object.parent;
+          }
+          return handles.includes(hit.object) ? 'toggle' : null;
         };
-        rayHandler = (event) => { if (event.isPrimary && hitHandle(event)) onToggle(); };
-        cursorHandler = (event) => { renderer.domElement.style.cursor = hitHandle(event) ? 'pointer' : 'default'; };
+        rayHandler = (event) => {
+          if (!event.isPrimary || event.button !== 0) return;
+          const action = actionAt(event);
+          if (action === 'toggle') onToggle();
+          else if (action) onSelectFolder?.(action);
+        };
+        cursorHandler = (event) => { renderer.domElement.style.cursor = actionAt(event) ? 'pointer' : 'default'; };
         renderer.domElement.addEventListener('pointerup', rayHandler);
         renderer.domElement.addEventListener('pointermove', cursorHandler);
         lostHandler = () => { if (alive) onReady(false, 'fallback'); };
@@ -219,7 +255,10 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
     return () => {
       alive = false; abort.abort(); cancelAnimationFrame(frame);
       observer?.disconnect(); visibility?.disconnect();
-      if (apiRef.current) gsap.killTweensOf(apiRef.current.drawer.position);
+      if (apiRef.current) {
+        apiRef.current.animation?.kill();
+        gsap.killTweensOf([apiRef.current.drawer.position, apiRef.current.pose]);
+      }
       apiRef.current = null;
       if (renderer) {
         renderer.domElement.removeEventListener('pointerup', rayHandler);
@@ -237,19 +276,24 @@ export default function ArchiveScene({ open, onToggle, onReady }) {
     if (!api || !loaded) return;
     hostRef.current.dataset.requestedOpen = String(open);
     const target = open ? 0.68 : 0.34;
-    if (Math.abs(api.drawer.position.z - target) < 0.0001) return;
+    const phase = open ? 1 : 0;
+    api.animation?.kill();
+    if (Math.abs(api.drawer.position.z - target) < 0.0001 && Math.abs(api.pose.progress - phase) < 0.0001) {
+      onTransitionEnd?.(open);
+      return;
+    }
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const tween = gsap.to(api.drawer.position, {
-      z: target,
-      duration: reduced ? 0 : 1.45,
-      ease: 'power3.inOut',
-      overwrite: 'auto',
+    const timeline = gsap.timeline({
       onUpdate: () => {
         hostRef.current.dataset.drawerPosition = api.drawer.position.z.toFixed(3);
         api.invalidate();
       },
+      onComplete: () => onTransitionEnd?.(open),
     });
-    return () => tween.kill();
+    timeline.to(api.pose, { progress: phase, duration: reduced ? 0 : open ? 2.1 : 1.7, ease: 'power3.inOut', overwrite: 'auto' }, 0);
+    timeline.to(api.drawer.position, { z: target, duration: reduced ? 0 : 1.35, ease: 'power2.inOut', overwrite: 'auto' }, reduced ? 0 : open ? 0.35 : 0);
+    api.animation = timeline;
+    return () => timeline.kill();
   }, { scope: hostRef, dependencies: [open, loaded] });
 
   return <div ref={hostRef} className="archive-canvas" data-status="loading" />;

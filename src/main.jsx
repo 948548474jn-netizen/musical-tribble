@@ -4,6 +4,7 @@ import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { ArrowDownRight, ArrowUpRight, ArrowRight, Menu, X, MoveUpRight } from 'lucide-react';
 import './styles.css';
+import ArchivePanel from './ArchivePanel.jsx';
 
 gsap.registerPlugin(useGSAP);
 // Keep interaction duration consistent when a graphics frame takes longer to render.
@@ -60,7 +61,19 @@ function Hero() {
   const [sceneReady, setSceneReady] = useState(false);
   const [sceneFallback, setSceneFallback] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const toggleDrawer = useCallback(() => setDrawerOpen((value) => !value), []);
+  const [archiveRevealed, setArchiveRevealed] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState(null);
+  const toggleDrawer = useCallback(() => {
+    setArchiveRevealed(false);
+    setTransitioning(true);
+    setDrawerOpen((value) => !value);
+  }, []);
+  const handleTransitionEnd = useCallback((opened) => {
+    setTransitioning(false);
+    setArchiveRevealed(opened);
+  }, []);
+  const closeFolder = useCallback(() => setSelectedFolder(null), []);
   const handleSceneReady = useCallback((ready, status) => {
     setSceneReady(ready);
     setSceneFallback(status === 'fallback');
@@ -135,7 +148,7 @@ function Hero() {
     };
   }, { scope: heroRef });
 
-  return <><section className="hero archive-hero" id="top" ref={heroRef} aria-labelledby="archive-title">
+  return <><section className={`hero archive-hero ${drawerOpen ? 'is-exploring' : ''}`} id="top" ref={heroRef} aria-labelledby="archive-title">
     <div className="archive-shell">
     <div className="archive-stage">
       <div className="archive-type" ref={typeRef} aria-hidden="true">
@@ -144,7 +157,7 @@ function Hero() {
       <div id="archive-model" className={`archive-visual ${sceneReady ? 'is-ready' : ''}`} role="group" aria-label="墨绿色设计档案柜，包含作品集、简历和技能卡" aria-busy={!sceneReady && !sceneFallback}>
         <img className="archive-poster" src={`${import.meta.env.BASE_URL}models/portfolio-archive-poster.webp`} alt="墨绿色金属档案柜与橙红色关节台灯" fetchPriority="high" decoding="async" />
         <Suspense fallback={null}>
-          <ArchiveScene open={drawerOpen} onToggle={toggleDrawer} onReady={handleSceneReady}/>
+          <ArchiveScene open={drawerOpen} onToggle={toggleDrawer} onReady={handleSceneReady} onTransitionEnd={handleTransitionEnd} onSelectFolder={setSelectedFolder}/>
         </Suspense>
         <span className="scene-hint" aria-live="polite">{sceneReady ? drawerOpen ? '档案已展开，慢慢翻阅。' : '点击拉手，打开档案。' : sceneFallback ? '向下探索，看看我的作品。' : '正在整理档案…'}</span>
       </div>
@@ -155,8 +168,14 @@ function Hero() {
         {sceneFallback ? <a className="archive-open" href="#work">浏览精选作品 <ArrowUpRight size={17}/></a> : <><button className="archive-open" type="button" onClick={toggleDrawer} disabled={!sceneReady} aria-expanded={drawerOpen} aria-controls="archive-model">{drawerOpen ? '收起设计抽屉' : '打开设计抽屉'} <ArrowUpRight size={17}/></button><a className="archive-browse" href="#work">查看作品 <ArrowDownRight size={16}/></a></>}
       </div></div>
     </div>
+    {drawerOpen && <div className="archive-explore-bar"><button type="button" onClick={toggleDrawer}>← 返回首页</button><p aria-live="polite">{transitioning ? '正在展开设计档案…' : '选择一份档案，慢慢翻阅。'}</p></div>}
+    {drawerOpen && archiveRevealed && !transitioning && <nav className="archive-folder-links" aria-label="抽屉里的档案">
+      <button type="button" onClick={() => setSelectedFolder('work')}><small>01</small><strong>作品集</strong><span>精选项目</span></button>
+      <button type="button" onClick={() => setSelectedFolder('resume')}><small>02</small><strong>简历</strong><span>经历与背景</span></button>
+      <button type="button" onClick={() => setSelectedFolder('skills')}><small>03</small><strong>技能卡</strong><span>方法与工具</span></button>
+    </nav>}
     </div>
-  </section><nav className="archive-foot" aria-label="首页快捷入口"><a href="#work">精选作品 <ArrowUpRight size={15}/></a><a href="#about">关于江南 <ArrowUpRight size={15}/></a></nav></>;
+  </section><nav className="archive-foot" aria-label="首页快捷入口"><a href="#work">精选作品 <ArrowUpRight size={15}/></a><a href="#about">关于江南 <ArrowUpRight size={15}/></a></nav><ArchivePanel selection={selectedFolder} onClose={closeFolder} projects={projects} capabilities={capabilities}/></>;
 }
 
 function SectionHead({ index, title, sub, note }) {
